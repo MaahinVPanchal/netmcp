@@ -11,6 +11,6 @@
   "netmcp": {
     "frontend_url": "https://voicezero.ai",
     "backend_url": "https://kitebvteletvheszekfg.supabase.co",
-    "storage_backend": "dynamodb"
+    "storage_backend": "files"
   }
 }

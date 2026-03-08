@@ -81,12 +81,34 @@ def create_app():
                     },
                     {
                         "name": "navigate_with_playwright",
-                        "description": "Open a URL in Chrome (Playwright), capture network, save to storage. Omit url to use FRONTEND_URL from mcp.json. Set headless=false to see the browser window.",
+                        "description": "Open a URL in Chrome (Playwright), capture network, save to storage. Omit url to use FRONTEND_URL. On Lambda use fetch_and_extract_apis instead (no browser).",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "url": {"type": "string", "description": "URL to navigate to (optional, uses FRONTEND_URL if not provided)"},
                                 "headless": {"type": "boolean", "description": "Run browser in headless mode", "default": False}
+                            }
+                        }
+                    },
+                    {
+                        "name": "fetch_and_extract_apis",
+                        "description": "Discover API/backend URLs from a page without a browser (works on Lambda). GETs the URL, parses HTML/JS for API-like URLs, saves them to storage. Use when Playwright is not available.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to fetch (optional, uses FRONTEND_URL if not provided)"},
+                                "fetch_linked_js": {"type": "boolean", "description": "Also fetch same-origin script files to find more APIs", "default": True},
+                                "max_js": {"type": "integer", "description": "Max number of linked JS files to fetch", "default": 5}
+                            }
+                        }
+                    },
+                    {
+                        "name": "get_backend_urls",
+                        "description": "Get unique API/backend-like URLs from stored network logs (from navigate or fetch_and_extract_apis).",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": {"type": "integer", "description": "Maximum number of backend URLs to return", "default": 50}
                             }
                         }
                     },
@@ -186,12 +208,14 @@ def create_app():
                 if tool_name == "navigate_to_app":
                     from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
                     if not PLAYWRIGHT_AVAILABLE:
-                        result = {"error": "Playwright not installed"}
+                        result = {"error": "Playwright is not installed (e.g. on Lambda). Run NetMCP locally with storage_backend: 'files' and install Playwright, or use fetch_and_extract_apis(url) to discover API URLs without a browser."}
                     else:
                         target = os.getenv("FRONTEND_URL", "").strip()
                         if not target:
                             result = {"error": "Set frontend_url in mcp.json"}
                         else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
                             entries = await navigate_and_capture_network(target, headless=tool_args.get("headless", False))
                             for e in entries:
                                 await db.save_request(e)
@@ -199,13 +223,62 @@ def create_app():
                 elif tool_name == "navigate_with_playwright":
                     from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
                     if not PLAYWRIGHT_AVAILABLE:
-                        result = {"error": "Playwright not installed"}
+                        result = {"error": "Playwright is not installed (e.g. on Lambda). Run NetMCP locally with storage_backend: 'files' and install Playwright, or use fetch_and_extract_apis(url) to discover API URLs without a browser."}
                     else:
                         target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
                         if not target:
                             result = {"error": "No URL provided"}
                         else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
                             entries = await navigate_and_capture_network(target, headless=tool_args.get("headless", False))
+                            for e in entries:
+                                await db.save_request(e)
+                            result = {"status": "ok", "url": target, "requests_captured": len(entries)}
+                elif tool_name == "fetch_and_extract_apis":
+                    from api_extract import fetch_and_extract_apis as _extract
+                    target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                    if not target:
+                        result = {"error": "No URL. Set url= or frontend_url in mcp.json"}
+                    else:
+                        entries = await _extract(target, fetch_linked_js=tool_args.get("fetch_linked_js", True), max_js=tool_args.get("max_js", 5))
+                        if entries and entries[0].get("error"):
+                            result = {"error": entries[0]["error"], "url": target}
+                        else:
+                            for e in entries:
+                                save_data = {k: v for k, v in e.items() if k != "_synthetic"}
+                                await db.save_request(save_data)
+                            urls = [e.get("url", "") for e in entries if e.get("url")]
+                            result = {"status": "ok", "url": target, "apis_discovered": len(urls), "backend_urls": urls[:50]}
+                elif tool_name == "get_backend_urls":
+                    limit = tool_args.get("limit", 50)
+                    requests = await db.get_recent_requests(limit * 2)
+                    seen = set()
+                    backend_urls = []
+                    keywords = ("/api", "supabase", "graphql", "rest", "execute-api", "webhook")
+                    for r in requests:
+                        u = (r.get("url") or "").strip()
+                        if not u or u in seen or len(u) < 10:
+                            continue
+                        u_lower = u.lower()
+                        if any(k in u_lower for k in keywords) or "supabase.co" in u or ".co/rest/" in u_lower:
+                            seen.add(u)
+                            backend_urls.append(u)
+                            if len(backend_urls) >= limit:
+                                break
+                    result = {"backend_urls": backend_urls, "count": len(backend_urls)}
+                elif tool_name == "navigate_with_selenium":
+                    from browser_selenium import navigate_and_capture_network_selenium, SELENIUM_AVAILABLE
+                    if not SELENIUM_AVAILABLE:
+                        result = {"error": "Selenium not installed. Run: pip install selenium"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL. Set url= or FRONTEND_URL in .env"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            entries = await navigate_and_capture_network_selenium(target, headless=tool_args.get("headless", False))
                             for e in entries:
                                 await db.save_request(e)
                             result = {"status": "ok", "url": target, "requests_captured": len(entries)}

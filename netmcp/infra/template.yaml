@@ -31,7 +31,7 @@ Resources:
     Properties:
       CodeUri: ../mcp-server/
       Handler: main.handler
-      Runtime: python3.10
+      Runtime: python3.12
       Timeout: 30
       MemorySize: 256
       Environment:

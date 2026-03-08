@@ -3,6 +3,13 @@ from typing import Optional
 import json
 import os
 
+# Message when Playwright is not available (e.g. on Lambda)
+_NAVIGATE_NO_PLAYWRIGHT = (
+    "Playwright is not installed (e.g. on Lambda there is no browser). "
+    "To capture full browser network traffic: run NetMCP locally with storage_backend: 'files' in mcp.json and install Playwright (pip install playwright && playwright install chromium). "
+    "Alternatively use fetch_and_extract_apis(url) to discover API/backend URLs from the page source without a browser (works on Lambda)."
+)
+
 
 def register_tools(mcp: FastMCP, db):  # db can be DynamoDBClient or FileStorage
     # --- Register navigate tools FIRST so they appear in Cursor's netmcp panel (first 6) ---
@@ -11,7 +18,7 @@ def register_tools(mcp: FastMCP, db):  # db can be DynamoDBClient or FileStorage
         """Open FRONTEND_URL (your app URL) in Chrome, capture all network requests (including backend/API), and save to storage. Click this first to open the browser and capture network tab data."""
         from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
         if not PLAYWRIGHT_AVAILABLE:
-            return json.dumps({"error": "Playwright not installed. Run: pip install playwright && playwright install chromium"})
+            return json.dumps({"error": _NAVIGATE_NO_PLAYWRIGHT})
         target = os.getenv("FRONTEND_URL", "").strip()
         if not target:
             return json.dumps({"error": "Set frontend_url in mcp.json (netmcp section) or FRONTEND_URL in .env"})
@@ -27,10 +34,10 @@ def register_tools(mcp: FastMCP, db):  # db can be DynamoDBClient or FileStorage
         url: Optional[str] = None,
         headless: bool = False,
     ) -> str:
-        """Open a URL in Chrome (Playwright), capture network, save to storage. Omit url to use FRONTEND_URL from mcp.json. Set headless=false to see the browser window."""
+        """Open a URL in Chrome (Playwright), capture network, save to storage. Omit url to use FRONTEND_URL from mcp.json. Set headless=false to see the browser window. On Lambda use fetch_and_extract_apis instead."""
         from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
         if not PLAYWRIGHT_AVAILABLE:
-            return json.dumps({"error": "Playwright not installed. Run: pip install playwright && playwright install chromium"})
+            return json.dumps({"error": _NAVIGATE_NO_PLAYWRIGHT})
         target = url or os.getenv("FRONTEND_URL", "").strip()
         if not target:
             return json.dumps({"error": "No URL. Set url= or frontend_url in mcp.json (netmcp section)"})
@@ -128,3 +135,42 @@ def register_tools(mcp: FastMCP, db):  # db can be DynamoDBClient or FileStorage
         for e in entries:
             await db.save_request(e)
         return json.dumps({"status": "ok", "url": target, "requests_captured": len(entries)})
+
+    @mcp.tool
+    async def fetch_and_extract_apis(
+        url: Optional[str] = None,
+        fetch_linked_js: bool = True,
+        max_js: int = 5,
+    ) -> str:
+        """Discover API/backend URLs from a page without a browser (works on Lambda). GETs the URL, parses HTML/JS for API-like URLs, saves them to storage so get_network_logs and get_backend_urls show them. Use when Playwright is not available."""
+        from api_extract import fetch_and_extract_apis as _extract
+        target = url or os.getenv("FRONTEND_URL", "").strip()
+        if not target:
+            return json.dumps({"error": "No URL. Set url= or frontend_url in mcp.json"})
+        entries = await _extract(target, fetch_linked_js=fetch_linked_js, max_js=max_js)
+        if entries and entries[0].get("error"):
+            return json.dumps({"error": entries[0]["error"], "url": target})
+        for e in entries:
+            save_data = {k: v for k, v in e.items() if k != "_synthetic"}
+            await db.save_request(save_data)
+        urls = [e.get("url", "") for e in entries if e.get("url")]
+        return json.dumps({"status": "ok", "url": target, "apis_discovered": len(urls), "backend_urls": urls[:50]})
+
+    @mcp.tool
+    async def get_backend_urls(limit: int = 50) -> str:
+        """Get unique API/backend-like URLs from stored network logs (e.g. from navigate or fetch_and_extract_apis). Filters for URLs containing api, supabase, graphql, rest, execute-api."""
+        requests = await db.get_recent_requests(limit * 2)
+        seen = set()
+        backend_urls = []
+        keywords = ("/api", "supabase", "graphql", "rest", "execute-api", "webhook")
+        for r in requests:
+            u = (r.get("url") or "").strip()
+            if not u or u in seen or len(u) < 10:
+                continue
+            u_lower = u.lower()
+            if any(k in u_lower for k in keywords) or "supabase.co" in u or ".co/rest/" in u_lower:
+                seen.add(u)
+                backend_urls.append(u)
+                if len(backend_urls) >= limit:
+                    break
+        return json.dumps({"backend_urls": backend_urls, "count": len(backend_urls)})
