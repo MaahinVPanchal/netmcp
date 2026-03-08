@@ -58,13 +58,56 @@ Perfect for **VoiceZero.ai**, **Supabase**-backed apps, or any frontend + backen
    - `fetch_and_extract_apis` – discover API URLs **without a browser** (works on Lambda).
    - `get_network_logs` / `get_failed_requests` / `get_backend_urls` / `search_requests` – query stored requests.
 
+![Cursor – Installed MCP Servers (netmcp with mcp-http and tools)](docs/cursor-mcp-servers.png)
+
+*Cursor: Installed MCP Servers showing netmcp using `.../Prod/mcp-http` and the list of tools (navigate_to_app, fetch_and_extract_apis, get_backend_urls, etc.).*
+
 ---
 
-## 🧠 Use in Claude Code
+## 🧠 Use in Claude Code / Claude Desktop
 
-1. **Configure MCP** in your Claude Code / Claude Desktop MCP settings to point at the same NetMCP endpoint (e.g. the Lambda `mcp-http` URL above, or your local `http://localhost:8000/mcp`).
-2. **Use the same `mcp.json`** structure: `mcpServers.netmcp` + optional `netmcp.frontend_url` / `netmcp.backend_url` / `netmcp.storage_backend`.
-3. In conversation, ask Claude to **use the netmcp tools** to capture or query network data (e.g. *“Use NetMCP to fetch_and_extract_apis for https://myapp.com and list get_backend_urls”*).
+**Config file location:**  
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`  
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+Use this exact URL in the args: **`.../Prod/mcp-http`** (not `.../Prod/mcp` or `.../Prod/mcp/`). You can pass frontend/backend/storage via headers as below.
+
+### Example `claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "netmcp": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http",
+        "--header",
+        "x-frontend-url:https://voicezero.ai",
+        "--header",
+        "x-backend-url:https://kitebvteletvheszekfg.supabase.co",
+        "--header",
+        "x-storage-backend:files"
+      ]
+    }
+  },
+  "preferences": {
+    "sidebarMode": "chat"
+  }
+}
+```
+
+Replace the URL and header values with your own frontend, backend, and optional `x-storage-backend` (e.g. `files` for local file storage).
+
+**In the UI:** Settings → Developer → Local MCP servers → Edit Config, or paste the above into your config file.
+
+![Claude Desktop – Local MCP servers (netmcp with mcp-http URL and headers)](docs/claude-desktop-mcp-config.png)
+
+*Claude Desktop: Settings → Developer → Local MCP servers. Use `/mcp-http` in the URL and optional `--header` args for frontend/backend/storage.*
+
+1. **Configure MCP** in Claude Desktop / Claude Code to point at the NetMCP endpoint (Lambda `.../Prod/mcp-http` or local `http://localhost:8000/mcp`).
+2. Use the same structure in your config: `mcpServers.netmcp` with `args` including the full URL and optional `--header x-frontend-url:...` etc.
+3. In conversation, ask Claude to **use the netmcp tools** (e.g. *“Use NetMCP fetch_and_extract_apis for https://myapp.com and get_backend_urls”*).
 
 ---
 

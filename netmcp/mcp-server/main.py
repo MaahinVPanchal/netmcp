@@ -41,13 +41,10 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    api.mount("/mcp", mcp_app)
-
-    # Stateless HTTP endpoint for Lambda compatibility (no SSE/session required)
-    # This allows mcp-remote to work with AWS Lambda
-    @api.post("/mcp-http")
-    async def mcp_http_endpoint(request: Request):
-        """Stateless HTTP endpoint for MCP JSON-RPC requests."""
+    # Stateless HTTP endpoint for Lambda compatibility (no SSE/session required).
+    # Register POST /mcp-http and POST /mcp so both work (Claude Code may use .../Prod/mcp/).
+    async def _mcp_http_handler(request: Request):
+        """Stateless MCP JSON-RPC handler."""
         try:
             body = await request.json()
             method = body.get("method")
@@ -342,6 +339,14 @@ def create_app():
                 "id": body.get("id") if 'body' in dir() else None,
                 "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
             }
+
+    # Register stateless handler for both paths so Claude Code (../Prod/mcp/) and Cursor (../Prod/mcp-http) work
+    api.add_api_route("/mcp-http", _mcp_http_handler, methods=["POST"])
+    api.add_api_route("/mcp", _mcp_http_handler, methods=["POST"])
+    api.add_api_route("/mcp/", _mcp_http_handler, methods=["POST"])
+    # On Lambda, do not mount the SSE app at /mcp so POST /mcp and /mcp/ hit our stateless handler above
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        api.mount("/mcp", mcp_app)
 
     @api.get("/mcp-http")
     async def mcp_http_get():
