@@ -42,3 +42,21 @@ Some platforms only use a Dockerfile when it’s in a specific path or when “U
 - **Runtime: Docker** so the root `Dockerfile` is used instead of Node + build commands.
 
 Once the Python image is used (via our Dockerfile or Python runtime), port **8000** and `uvicorn main:app` will work.
+
+---
+
+## Option 4: Platform uses Node image and injects your Build/Start (workaround)
+
+If mcp-use **always generates a Node-based Dockerfile** and ignores the repo Dockerfile ("Dockerfile generated successfully" in logs), install Python **inside** the Node Alpine image so the build succeeds.
+
+In **Build & Runtime** use:
+
+| Field | Value |
+|-------|--------|
+| **Build Command** | `apk add --no-cache python3 py3-pip && cd mcp-server && pip3 install -r requirements.txt` |
+| **Start Command** | `cd mcp-server && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000` |
+| **Port** | `8000` |
+
+Then **Redeploy**. The build step installs Python + pip in the Alpine image; the start step runs NetMCP from `mcp-server`.
+
+**Important:** This repo has a **`mcp-server`** folder at the **repo root** (a copy of `netmcp/mcp-server`) so that mcp-use’s build finds it. Ensure the project connected in mcp-use is this repo and the root directory is the repo root (not a subfolder). After pushing, use the commands above.
