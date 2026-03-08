@@ -163,6 +163,59 @@ See **[netmcp/infra/DEPLOY.md](netmcp/infra/DEPLOY.md)** for parameter details a
 
 ---
 
+## 💵 How to get the $20 billing alert
+
+Your current deploy may have **cost protection turned off** (`EnableCostProtection=false`). To get an **email when estimated charges hit $20**:
+
+1. **Redeploy with cost protection and your email:**
+   ```powershell
+   cd netmcp\infra
+   $env:PIP_PLATFORM = "manylinux2014_x86_64"
+   sam build
+   sam deploy --no-confirm-changeset `
+     --stack-name netmcp-app `
+     --parameter-overrides `
+       "FrontendUrl=https://voicezero.ai" `
+       "BackendUrl=https://kitebvteletvheszekfg.supabase.co" `
+       "EnableCostProtection=true" `
+       "AlertEmail=your-email@example.com" `
+       "MonthlyBudget=20" `
+     --capabilities CAPABILITY_IAM
+   ```
+2. **Confirm the SNS email** – AWS sends a subscription confirmation to `AlertEmail`; click the link so the alarm can notify you.
+3. When estimated monthly charges exceed **$20**, CloudWatch triggers the alarm and you get an email.  
+   If deploy fails with a validation hook, keep `EnableCostProtection=false` and set a **manual budget alert** in **AWS Billing → Budgets** (e.g. $20/month, email notification).
+
+---
+
+## 📤 Provide your MCP tool for mcp-use (share with others)
+
+Your NetMCP server is **already an existing MCP server** (built with FastMCP, deployed on Lambda). To **provide it** so others can use it in Cursor / Claude / mcp-use:
+
+1. **Use the “Deploy an existing MCP server” path** (as in the MCP setup UI): your server is deployed at your API Gateway URL; you only need to share how to connect.
+2. **Share your public MCP endpoint** and a ready-to-paste config:
+   - **Endpoint:** `https://YOUR_API.execute-api.us-east-1.amazonaws.com/Prod/mcp-http`  
+     (replace with your stack’s URL, e.g. from `sam deploy` outputs or AWS Console.)
+   - **Config for Cursor / Claude** (they paste this into MCP settings):
+   ```json
+   {
+     "mcpServers": {
+       "netmcp": {
+         "command": "npx",
+         "args": [
+           "mcp-remote",
+           "https://YOUR_API.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+         ]
+       }
+     }
+   }
+   ```
+3. **Optional:** Add `--header` args if they need a specific frontend/backend:
+   `"--header" "x-frontend-url:https://their-app.com"` and `"--header" "x-backend-url:https://their-supabase.supabase.co"`.
+4. **If mcp-use is a directory or marketplace:** submit your server there using the same **mcp-http** URL and, if they ask, the JSON snippet above. Your tool is “deployed” once the Lambda stack is live; “providing” it = sharing the URL + config.
+
+---
+
 ## 📖 Full documentation
 
 - **[netmcp/README.md](netmcp/README.md)** – All MCP tools, storage backends (`files` vs DynamoDB), VoiceZero.ai + Supabase setup, browser extension, proxy, and Docker.

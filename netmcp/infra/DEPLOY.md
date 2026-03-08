@@ -47,16 +47,21 @@ sam deploy `
 
 ### Deploy with Cost Protection (Recommended)
 
+To get an **email when estimated charges hit e.g. $20**, set `EnableCostProtection=true`, `AlertEmail`, and `MonthlyBudget=20`:
+
 ```powershell
 sam deploy `
   --no-confirm-changeset `
   --parameter-overrides `
     "FrontendUrl=https://your-app.com" `
     "BackendUrl=https://your-project.supabase.co" `
+    "EnableCostProtection=true" `
     "AlertEmail=your-email@example.com" `
-    "MonthlyBudget=15" `
+    "MonthlyBudget=20" `
   --capabilities CAPABILITY_IAM
 ```
+
+(If your account fails validation with cost protection, use `EnableCostProtection=false` and set a budget alert manually in **AWS Billing → Budgets**.)
 
 ### Parameters
 
@@ -65,7 +70,7 @@ sam deploy `
 | `FrontendUrl` | Your app's frontend URL | (empty) |
 | `BackendUrl` | API/Supabase base URL | (empty) |
 | `AlertEmail` | Email for billing alerts | (empty) |
-| `MonthlyBudget` | Billing alert threshold in USD | 15 |
+| `MonthlyBudget` | Billing alert threshold in USD (e.g. 20 for $20 alert) | 15 |
 
 ---
 
