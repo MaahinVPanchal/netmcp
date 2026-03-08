@@ -57,6 +57,6 @@ In **Build & Runtime** use:
 | **Start Command** | `cd mcp-server && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000` |
 | **Port** | `8000` |
 
-Then **Redeploy**. The build step installs Python + pip in the Alpine image; the start step runs NetMCP from `mcp-server`.
+Then **Redeploy**. The build step installs Python + pip in the Alpine image; the start step runs NetMCP. Use **Start Command** `python3 main.py` so the app respects the **PORT** env var (many platforms set it).
 
 **Important:** This repo has a **`mcp-server`** folder at the **repo root** (a copy of `netmcp/mcp-server`) so that mcp-use’s build finds it. Ensure the project connected in mcp-use is this repo and the root directory is the repo root (not a subfolder). After pushing, use the commands above.
