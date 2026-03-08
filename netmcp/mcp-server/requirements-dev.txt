@@ -1,0 +1,11 @@
+# Use this for local dev (includes Playwright/Selenium for navigate_to_app).
+# Lambda deploy uses requirements.txt (no browser deps).
+fastapi
+uvicorn
+fastmcp
+boto3
+pydantic
+python-dotenv
+mangum
+playwright
+selenium

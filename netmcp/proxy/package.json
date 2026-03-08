@@ -1,0 +1,17 @@
+{
+  "name": "netmcp-proxy",
+  "version": "1.0.0",
+  "description": "NetMCP local HTTP proxy — forwards traffic and sends logs to MCP ingest",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "http-proxy": "^1.18.1"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

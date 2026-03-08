@@ -1,0 +1,1 @@
+{"statusCode": 400, "headers": {"content-type": "application/json", "mcp-session-id": "465782dc3c534039a41f2a1ec2f88168", "content-length": "105"}, "multiValueHeaders": {}, "body": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Bad Request: Missing session ID\"}}", "isBase64Encoded": false}

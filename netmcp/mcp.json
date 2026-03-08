@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "netmcp": {
+      "url": "http://localhost:8000/mcp"
+    }
+  },
+  "netmcp": {
+    "frontend_url": "",
+    "backend_url": "",
+    "storage_backend": "file",
+    "netmcp_log_file": "netmcp_logs.txt"
+  }
+}

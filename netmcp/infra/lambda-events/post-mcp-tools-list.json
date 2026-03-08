@@ -1,0 +1,16 @@
+{
+  "resource": "/{proxy+}",
+  "path": "/mcp/",
+  "httpMethod": "POST",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream"
+  },
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}",
+  "requestContext": {
+    "path": "/mcp/",
+    "stage": "Prod",
+    "requestId": "test-tools-list",
+    "identity": {}
+  }
+}

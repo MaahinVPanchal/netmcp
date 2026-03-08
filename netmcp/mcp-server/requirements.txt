@@ -1,0 +1,9 @@
+# Lambda deployment (no Playwright/Selenium - no browser on Lambda).
+# For local dev: pip install -r requirements-dev.txt
+fastapi
+uvicorn
+fastmcp
+boto3
+pydantic
+python-dotenv
+mangum

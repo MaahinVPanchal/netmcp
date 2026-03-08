@@ -1,0 +1,11 @@
+{
+  "resource": "/health",
+  "path": "/health",
+  "httpMethod": "GET",
+  "headers": {},
+  "requestContext": {
+    "path": "/health",
+    "stage": "Prod",
+    "requestId": "test-health"
+  }
+}

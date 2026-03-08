@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "NetMCP - AI Network Inspector",
+  "version": "1.0.0",
+  "description": "Capture network requests and send to NetMCP for AI debugging",
+  "permissions": ["storage", "activeTab"],
+  "devtools_page": "devtools.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "NetMCP"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
