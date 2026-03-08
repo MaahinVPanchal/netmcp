@@ -1,20 +1,43 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: NetMCP - API Gateway + Lambda + DynamoDB
+Description: NetMCP - API Gateway + Lambda + DynamoDB with Billing Alerts
 
 Parameters:
   FrontendUrl:
     Type: String
     Description: Frontend URL (e.g. your app) for MCP tools - set when deploying
+    Default: ""
   BackendUrl:
     Type: String
     Description: Backend/API base URL (e.g. Supabase) - set when deploying
+    Default: ""
+  AlertEmail:
+    Type: String
+    Description: Email address for billing alerts (optional)
+    Default: ""
+  MonthlyBudget:
+    Type: Number
+    Description: Monthly budget in USD for billing alert
+    Default: 15
+    MinValue: 1
+    MaxValue: 100
+  EnableCostProtection:
+    Type: String
+    Description: Set to true to create billing alarm and cost anomaly (requires us-east-1, can trigger validation in some accounts)
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+  EnableCostProtection: !Equals [!Ref EnableCostProtection, "true"]
+  HasAlertEmailAndCostProtection: !And [!Condition HasAlertEmail, !Condition EnableCostProtection]
 
 Resources:
+  # DynamoDB Table with TTL for automatic data cleanup
   NetMCPTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: netmcp-requests
+      TableName: !Sub "${AWS::StackName}-requests"
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S
@@ -25,7 +48,15 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      Tags:
+        - Key: Project
+          Value: NetMCP
+        - Key: CostCenter
+          Value: Development
 
+  # Lambda Function with cost optimizations
   NetMCPFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -43,6 +74,14 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref NetMCPTable
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
       Events:
         Api:
           Type: Api
@@ -54,15 +93,126 @@ Resources:
           Properties:
             Path: /
             Method: ANY
+      Tags:
+        Project: NetMCP
+        CostCenter: Development
+
+  # CloudWatch Log Group with retention to control costs
+  NetMCPLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${NetMCPFunction}"
+      RetentionInDays: 7
+
+  # SNS Topic for billing alerts
+  BillingAlertTopic:
+    Type: AWS::SNS::Topic
+    Condition: EnableCostProtection
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-billing-alerts"
+      Tags:
+        Project: NetMCP
+
+  # Email subscription for billing alerts (optional)
+  BillingAlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmailAndCostProtection
+    Properties:
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+      TopicArn: !Ref BillingAlertTopic
+
+  # CloudWatch Billing Alarm - triggers when estimated charges exceed threshold
+  BillingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableCostProtection
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-monthly-budget-alert"
+      AlarmDescription: !Sub "Alarm when estimated monthly charges exceed $${MonthlyBudget}"
+      MetricName: EstimatedCharges
+      Namespace: AWS/Billing
+      Statistic: Maximum
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: !Ref MonthlyBudget
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref BillingAlertTopic
+      Dimensions:
+        - Name: Currency
+          Value: USD
+      Tags:
+        - Key: Project
+          Value: NetMCP
+
+  # Cost Anomaly Detection for proactive cost monitoring
+  CostAnomalyDetector:
+    Type: AWS::CE::AnomalyMonitor
+    Condition: EnableCostProtection
+    Properties:
+      MonitorName: !Sub "${AWS::StackName}-cost-anomaly"
+      MonitorType: DIMENSIONAL
+      MonitorSpecification: |
+        {
+          "Dimension": "SERVICE",
+          "MatchOptions": ["EQUALS"],
+          "Values": ["AWS Lambda", "Amazon DynamoDB", "Amazon API Gateway"]
+        }
+
+  # Cost Anomaly Alert
+  CostAnomalyAlert:
+    Type: AWS::CE::AnomalySubscription
+    Condition: EnableCostProtection
+    Properties:
+      SubscriptionName: !Sub "${AWS::StackName}-anomaly-alert"
+      Threshold: 5
+      Frequency: IMMEDIATE
+      MonitorArnList:
+        - !Ref CostAnomalyDetector
+      Subscribers:
+        - Type: SNS
+          Address: !Ref BillingAlertTopic
+
+  # Lambda function to automatically clean old data (cost control)
+  CleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../mcp-server/
+      Handler: util.cleanup_old_records
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          DYNAMO_TABLE: !Ref NetMCPTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NetMCPTable
+      Events:
+        ScheduledCleanup:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Description: Daily cleanup of old records
 
 Outputs:
   NetMCPApiUrl:
     Description: API Gateway base URL
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
-      Name: NetMCPApiUrl
+      Name: !Sub "${AWS::StackName}-NetMCPApiUrl"
   NetMCPTableName:
     Description: DynamoDB table name
     Value: !Ref NetMCPTable
     Export:
-      Name: NetMCPTableName
+      Name: !Sub "${AWS::StackName}-NetMCPTableName"
+  BillingAlertTopic:
+    Condition: EnableCostProtection
+    Description: SNS Topic for billing alerts
+    Value: !Ref BillingAlertTopic
+  CostAnomalyDetector:
+    Condition: EnableCostProtection
+    Description: Cost anomaly detector ARN
+    Value: !Ref CostAnomalyDetector
+    Export:
+      Name: !Sub "${AWS::StackName}-CostAnomalyDetector"

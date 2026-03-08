@@ -51,29 +51,99 @@ class FileStorage:
             "request_headers": data.get("request_headers") or {},
             "request_body": data.get("request_body") or "",
             "response_headers": data.get("response_headers") or {},
-            "response_body": (str(data.get("response_body") or "")[:5000]),
+            "response_body": (str(data.get("response_body") or "")[:5000],
+            "resource_type": data.get("resource_type", "unknown"),
+            "console_logs": data.get("console_logs") or [],
+            "capture_session_id": data.get("capture_session_id", ""),
         }
         await asyncio.to_thread(self._append_sync, item)
 
-    async def get_recent_requests(self, limit: int = 20) -> List[Any]:
+    async def save_console_logs(self, session_id: str, logs: List[dict]) -> None:
+        """Save console logs as a separate entry for a capture session."""
+        if not logs:
+            return
+        item = {
+            "id": f"console_{session_id}",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "url": "console_logs",
+            "method": "CONSOLE",
+            "status": 0,
+            "response_time_ms": 0,
+            "request_headers": {},
+            "request_body": "",
+            "response_headers": {},
+            "response_body": "",
+            "console_logs": logs[:100],
+            "capture_session_id": session_id,
+        }
+        await asyncio.to_thread(self._append_sync, item)
+
+    async def get_recent_requests(self, limit: int = 20, include_bodies: bool = False) -> List[Any]:
         def _get():
             items = self._read_all_sync()
-            return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+            # Filter out console-only items
+            items = [i for i in items if i.get("method") != "CONSOLE"]
+            items = sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+            if not include_bodies:
+                for item in items:
+                    item["request_body"] = ""
+                    item["response_body"] = ""
+
+            return items
 
         return await asyncio.to_thread(_get)
 
-    async def get_failed_requests(self, limit: int = 20) -> List[Any]:
+    async def get_console_logs(self, session_id: Optional[str] = None, limit: int = 100) -> List[Any]:
         def _get():
             items = self._read_all_sync()
-            items = [i for i in items if (i.get("status") or 0) >= 400]
-            return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+            # Extract console logs from items
+            all_logs = []
+            for item in items:
+                # Filter by session ID if provided
+                if session_id and item.get("capture_session_id") != session_id:
+                    continue
+
+                logs = item.get("console_logs", [])
+                if logs:
+                    sess_id = item.get("capture_session_id", item.get("id"))
+                    for log in logs:
+                        log_entry = dict(log)
+                        log_entry["session_id"] = sess_id
+                        log_entry["capture_timestamp"] = item.get("timestamp")
+                        all_logs.append(log_entry)
+
+            return sorted(all_logs, key=lambda x: x.get("timestamp", 0), reverse=True)[:limit]
 
         return await asyncio.to_thread(_get)
 
-    async def get_by_url(self, url: str) -> List[Any]:
+    async def get_failed_requests(self, limit: int = 20, include_bodies: bool = False) -> List[Any]:
         def _get():
             items = self._read_all_sync()
-            return [i for i in items if url in (i.get("url") or "")]
+            items = [i for i in items if (i.get("status") or 0) >= 400 and i.get("method") != "CONSOLE"]
+            items = sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+            if not include_bodies:
+                for item in items:
+                    item["request_body"] = ""
+                    item["response_body"] = ""
+
+            return items
+
+        return await asyncio.to_thread(_get)
+
+    async def get_by_url(self, url: str, include_body: bool = False) -> List[Any]:
+        def _get():
+            items = self._read_all_sync()
+            items = [i for i in items if url in (i.get("url") or "") and i.get("method") != "CONSOLE"]
+
+            if not include_body:
+                for item in items:
+                    item["request_body"] = ""
+                    item["response_body"] = ""
+
+            return items
 
         return await asyncio.to_thread(_get)
 
@@ -83,23 +153,42 @@ class FileStorage:
         status_code: Optional[int] = None,
         url_contains: Optional[str] = None,
         limit: int = 20,
+        include_bodies: bool = False,
     ) -> List[Any]:
         def _get():
             items = self._read_all_sync()
+            # Filter out console-only items
+            items = [i for i in items if i.get("method") != "CONSOLE"]
+
             if method:
                 items = [i for i in items if i.get("method") == method.upper()]
             if status_code is not None:
                 items = [i for i in items if i.get("status") == status_code]
             if url_contains:
                 items = [i for i in items if url_contains in (i.get("url") or "")]
-            return sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+            items = sorted(items, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit]
+
+            if not include_bodies:
+                for item in items:
+                    item["request_body"] = ""
+                    item["response_body"] = ""
+
+            return items
 
         return await asyncio.to_thread(_get)
 
-    async def get_slow_requests(self, threshold_ms: int) -> List[Any]:
+    async def get_slow_requests(self, threshold_ms: int, include_bodies: bool = False) -> List[Any]:
         def _get():
             items = self._read_all_sync()
-            return [i for i in items if (i.get("response_time_ms") or 0) >= threshold_ms]
+            items = [i for i in items if (i.get("response_time_ms") or 0) >= threshold_ms and i.get("method") != "CONSOLE"]
+
+            if not include_bodies:
+                for item in items:
+                    item["request_body"] = ""
+                    item["response_body"] = ""
+
+            return items
 
         return await asyncio.to_thread(_get)
 

@@ -52,7 +52,9 @@
         "lambda:DeleteFunction",
         "lambda:AddPermission",
         "lambda:RemovePermission",
-        "lambda:PublishVersion"
+        "lambda:PublishVersion",
+        "lambda:PutProvisionedConcurrencyConfig",
+        "lambda:DeleteProvisionedConcurrencyConfig"
       ],
       "Resource": "*"
     },
@@ -83,6 +85,59 @@
         "dynamodb:UpdateItem",
         "dynamodb:DeleteItem",
         "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchNetmcp",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:PutMetricData",
+        "cloudwatch:GetMetricStatistics"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SNSNetmcp",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:DeleteTopic",
+        "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes",
+        "sns:Subscribe",
+        "sns:Unsubscribe",
+        "sns:Publish"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CECostExplorerNetmcp",
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetAnomalies",
+        "ce:GetAnomalyMonitors",
+        "ce:GetAnomalySubscriptions",
+        "ce:CreateAnomalyMonitor",
+        "ce:CreateAnomalySubscription",
+        "ce:DeleteAnomalyMonitor",
+        "ce:DeleteAnomalySubscription"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EventsNetmcp",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:DeleteRule",
+        "events:DescribeRule",
+        "events:PutTargets",
+        "events:RemoveTargets"
       ],
       "Resource": "*"
     },
@@ -121,7 +176,9 @@
         "logs:CreateLogGroup",
         "logs:PutLogEvents",
         "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams"
+        "logs:DescribeLogStreams",
+        "logs:DeleteLogGroup",
+        "logs:PutRetentionPolicy"
       ],
       "Resource": "*"
     }

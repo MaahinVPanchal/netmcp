@@ -61,95 +61,146 @@ def create_app():
                             "tools": {"listChanged": True},
                             "resources": {"subscribe": False, "listChanged": True}
                         },
-                        "serverInfo": {"name": "NetMCP", "version": "3.1.0"}
+                        "serverInfo": {"name": "NetMCP", "version": "3.2.0"}
                     }
                 }
             elif method == "tools/list":
                 tools = [
                     {
                         "name": "navigate_to_app",
-                        "description": "Open FRONTEND_URL (your app URL) in Chrome, capture all network requests (including backend/API), and save to storage. Click this first to open the browser and capture network tab data.",
+                        "description": "Open FRONTEND_URL in Chrome, capture network requests, console logs, and save to storage. Set capture_response_bodies=true to capture JSON payloads (up to 10KB).",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "headless": {"type": "boolean", "description": "Run browser in headless mode", "default": False}
+                                "headless": {"type": "boolean", "description": "Run browser in headless mode", "default": False},
+                                "capture_console_logs": {"type": "boolean", "description": "Capture browser console logs", "default": True},
+                                "capture_response_bodies": {"type": "boolean", "description": "Capture JSON response bodies", "default": False},
                             }
                         }
                     },
                     {
                         "name": "navigate_with_playwright",
-                        "description": "Open a URL in Chrome (Playwright), capture network, save to storage. Omit url to use FRONTEND_URL. On Lambda use fetch_and_extract_apis instead (no browser).",
+                        "description": "Open a URL in Chrome (Playwright), capture network and console logs. Set capture_response_bodies=true for JSON payloads.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "url": {"type": "string", "description": "URL to navigate to (optional, uses FRONTEND_URL if not provided)"},
-                                "headless": {"type": "boolean", "description": "Run browser in headless mode", "default": False}
+                                "url": {"type": "string", "description": "URL to navigate to"},
+                                "headless": {"type": "boolean", "default": False},
+                                "capture_console_logs": {"type": "boolean", "default": True},
+                                "capture_response_bodies": {"type": "boolean", "default": False},
+                            }
+                        }
+                    },
+                    {
+                        "name": "navigate_with_selenium",
+                        "description": "Open a URL in Chrome via Selenium, capture network requests and console logs.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to navigate to"},
+                                "headless": {"type": "boolean", "default": False},
+                                "capture_console_logs": {"type": "boolean", "default": True},
                             }
                         }
                     },
                     {
                         "name": "fetch_and_extract_apis",
-                        "description": "Discover API/backend URLs from a page without a browser (works on Lambda). GETs the URL, parses HTML/JS for API-like URLs, saves them to storage. Use when Playwright is not available.",
+                        "description": "Discover API/backend URLs from a page without a browser (works on Lambda). Parses HTML/JS for API-like URLs.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "url": {"type": "string", "description": "URL to fetch (optional, uses FRONTEND_URL if not provided)"},
-                                "fetch_linked_js": {"type": "boolean", "description": "Also fetch same-origin script files to find more APIs", "default": True},
-                                "max_js": {"type": "integer", "description": "Max number of linked JS files to fetch", "default": 5}
+                                "url": {"type": "string", "description": "URL to fetch"},
+                                "fetch_linked_js": {"type": "boolean", "default": True},
+                                "max_js": {"type": "integer", "default": 5}
                             }
                         }
                     },
                     {
                         "name": "get_backend_urls",
-                        "description": "Get unique API/backend-like URLs from stored network logs (from navigate or fetch_and_extract_apis).",
+                        "description": "Get unique API/backend-like URLs from stored network logs.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "limit": {"type": "integer", "description": "Maximum number of backend URLs to return", "default": 50}
+                                "limit": {"type": "integer", "default": 50}
                             }
                         }
                     },
                     {
                         "name": "get_network_logs",
-                        "description": "Get recent network requests captured from the developer's browser",
+                        "description": "Get recent network requests. Set include_bodies=true to include request/response bodies.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "limit": {"type": "integer", "description": "Maximum number of logs to return", "default": 20}
+                                "limit": {"type": "integer", "default": 20},
+                                "include_bodies": {"type": "boolean", "default": False}
+                            }
+                        }
+                    },
+                    {
+                        "name": "get_network_logs_with_bodies",
+                        "description": "Get recent network requests WITH bodies included (for debugging).",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": {"type": "integer", "default": 20}
                             }
                         }
                     },
                     {
                         "name": "get_failed_requests",
-                        "description": "Get only failed network requests (status >= 400)",
+                        "description": "Get failed network requests (status >= 400). Set include_bodies=true for error payloads.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "limit": {"type": "integer", "description": "Maximum number of failed requests to return", "default": 20}
+                                "limit": {"type": "integer", "default": 20},
+                                "include_bodies": {"type": "boolean", "default": False}
+                            }
+                        }
+                    },
+                    {
+                        "name": "get_failed_requests_with_bodies",
+                        "description": "Get failed requests WITH bodies for debugging error payloads.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": {"type": "integer", "default": 20}
                             }
                         }
                     },
                     {
                         "name": "get_endpoint_details",
-                        "description": "Get full request and response details for a specific endpoint URL",
+                        "description": "Get full request/response details for a specific URL. Set include_body=true for response content.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "url": {"type": "string", "description": "The endpoint URL to get details for"}
+                                "url": {"type": "string", "description": "The endpoint URL"},
+                                "include_body": {"type": "boolean", "default": False}
+                            },
+                            "required": ["url"]
+                        }
+                    },
+                    {
+                        "name": "get_endpoint_details_with_body",
+                        "description": "Get endpoint details INCLUDING the response body.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "The endpoint URL"}
                             },
                             "required": ["url"]
                         }
                     },
                     {
                         "name": "search_requests",
-                        "description": "Search network requests by method (GET/POST), status code, or URL substring",
+                        "description": "Search network requests by method, status code, or URL substring.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "method": {"type": "string", "description": "HTTP method to filter by (GET, POST, etc.)"},
-                                "status_code": {"type": "integer", "description": "HTTP status code to filter by"},
-                                "url_contains": {"type": "string", "description": "URL substring to search for"},
-                                "limit": {"type": "integer", "description": "Maximum number of results", "default": 20}
+                                "method": {"type": "string"},
+                                "status_code": {"type": "integer"},
+                                "url_contains": {"type": "string"},
+                                "limit": {"type": "integer", "default": 20},
+                                "include_bodies": {"type": "boolean", "default": False}
                             }
                         }
                     },
@@ -164,29 +215,42 @@ def create_app():
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "threshold_ms": {"type": "integer", "description": "Response time threshold in milliseconds", "default": 1000}
+                                "threshold_ms": {"type": "integer", "default": 1000},
+                                "include_bodies": {"type": "boolean", "default": False}
                             }
                         }
                     },
                     {
                         "name": "export_network_logs_to_txt",
-                        "description": "Export stored network logs to a human-readable text file",
+                        "description": "Export network logs to a text file. Set include_bodies=true to include response bodies.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "file_path": {"type": "string", "description": "Path for the output file", "default": "netmcp_export.txt"},
-                                "limit": {"type": "integer", "description": "Maximum number of logs to export", "default": 100}
+                                "file_path": {"type": "string", "default": "netmcp_export.txt"},
+                                "limit": {"type": "integer", "default": 100},
+                                "include_bodies": {"type": "boolean", "default": False}
                             }
                         }
                     },
                     {
-                        "name": "navigate_with_selenium",
-                        "description": "Open a URL in Chrome via Selenium, capture network requests, and save them to storage",
+                        "name": "get_console_logs",
+                        "description": "Get browser console logs from captures. Filter by session_id or log_type (error/warning/log/info/debug).",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
-                                "url": {"type": "string", "description": "URL to navigate to (optional, uses FRONTEND_URL if not provided)"},
-                                "headless": {"type": "boolean", "description": "Run browser in headless mode", "default": False}
+                                "session_id": {"type": "string", "description": "Filter by capture session ID"},
+                                "log_type": {"type": "string", "description": "Filter by type: error, warning, log, info, debug"},
+                                "limit": {"type": "integer", "default": 100}
+                            }
+                        }
+                    },
+                    {
+                        "name": "get_console_errors",
+                        "description": "Get only console errors and page errors from browser captures",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "limit": {"type": "integer", "default": 50}
                             }
                         }
                     },
@@ -200,12 +264,18 @@ def create_app():
                 tool_name = params.get("name", "")
                 tool_args = params.get("arguments", {})
 
+                # Import browser modules for availability checks
+                from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
+                from browser_selenium import navigate_and_capture_network_selenium, SELENIUM_AVAILABLE
+                import uuid
+
                 # Map tool calls to actual functions
                 result = None
+
+                # Navigation tools
                 if tool_name == "navigate_to_app":
-                    from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
                     if not PLAYWRIGHT_AVAILABLE:
-                        result = {"error": "Playwright is not installed (e.g. on Lambda). Run NetMCP locally with storage_backend: 'files' and install Playwright, or use fetch_and_extract_apis(url) to discover API URLs without a browser."}
+                        result = {"error": "Playwright not installed"}
                     else:
                         target = os.getenv("FRONTEND_URL", "").strip()
                         if not target:
@@ -213,14 +283,31 @@ def create_app():
                         else:
                             if not target.startswith(("http://", "https://")):
                                 target = "https://" + target
-                            entries = await navigate_and_capture_network(target, headless=tool_args.get("headless", False))
+                            session_id = str(uuid.uuid4())
+                            capture_result = await navigate_and_capture_network(
+                                target,
+                                headless=tool_args.get("headless", False),
+                                capture_console_logs=tool_args.get("capture_console_logs", True),
+                                capture_response_bodies=tool_args.get("capture_response_bodies", False),
+                            )
+                            entries = capture_result.get("requests", [])
+                            console_logs = capture_result.get("console_logs", [])
                             for e in entries:
+                                e["capture_session_id"] = session_id
                                 await db.save_request(e)
-                            result = {"status": "ok", "url": target, "requests_captured": len(entries)}
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+                            result = {
+                                "status": "ok",
+                                "url": target,
+                                "session_id": session_id,
+                                "requests_captured": len(entries),
+                                "console_logs_captured": len(console_logs),
+                            }
+
                 elif tool_name == "navigate_with_playwright":
-                    from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
                     if not PLAYWRIGHT_AVAILABLE:
-                        result = {"error": "Playwright is not installed (e.g. on Lambda). Run NetMCP locally with storage_backend: 'files' and install Playwright, or use fetch_and_extract_apis(url) to discover API URLs without a browser."}
+                        result = {"error": "Playwright not installed"}
                     else:
                         target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
                         if not target:
@@ -228,25 +315,77 @@ def create_app():
                         else:
                             if not target.startswith(("http://", "https://")):
                                 target = "https://" + target
-                            entries = await navigate_and_capture_network(target, headless=tool_args.get("headless", False))
+                            session_id = str(uuid.uuid4())
+                            capture_result = await navigate_and_capture_network(
+                                target,
+                                headless=tool_args.get("headless", False),
+                                capture_console_logs=tool_args.get("capture_console_logs", True),
+                                capture_response_bodies=tool_args.get("capture_response_bodies", False),
+                            )
+                            entries = capture_result.get("requests", [])
+                            console_logs = capture_result.get("console_logs", [])
                             for e in entries:
+                                e["capture_session_id"] = session_id
                                 await db.save_request(e)
-                            result = {"status": "ok", "url": target, "requests_captured": len(entries)}
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+                            result = {
+                                "status": "ok",
+                                "url": target,
+                                "session_id": session_id,
+                                "requests_captured": len(entries),
+                                "console_logs_captured": len(console_logs),
+                            }
+
+                elif tool_name == "navigate_with_selenium":
+                    if not SELENIUM_AVAILABLE:
+                        result = {"error": "Selenium not installed"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL provided"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            session_id = str(uuid.uuid4())
+                            capture_result = await navigate_and_capture_network_selenium(
+                                target,
+                                headless=tool_args.get("headless", False),
+                                capture_console_logs=tool_args.get("capture_console_logs", True),
+                            )
+                            entries = capture_result.get("requests", [])
+                            console_logs = capture_result.get("console_logs", [])
+                            for e in entries:
+                                e["capture_session_id"] = session_id
+                                await db.save_request(e)
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+                            result = {
+                                "status": "ok",
+                                "url": target,
+                                "session_id": session_id,
+                                "requests_captured": len(entries),
+                                "console_logs_captured": len(console_logs),
+                            }
+
                 elif tool_name == "fetch_and_extract_apis":
                     from api_extract import fetch_and_extract_apis as _extract
                     target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
                     if not target:
-                        result = {"error": "No URL. Set url= or frontend_url in mcp.json"}
+                        result = {"error": "No URL"}
                     else:
+                        session_id = str(uuid.uuid4())
                         entries = await _extract(target, fetch_linked_js=tool_args.get("fetch_linked_js", True), max_js=tool_args.get("max_js", 5))
                         if entries and entries[0].get("error"):
                             result = {"error": entries[0]["error"], "url": target}
                         else:
                             for e in entries:
                                 save_data = {k: v for k, v in e.items() if k != "_synthetic"}
+                                save_data["capture_session_id"] = session_id
                                 await db.save_request(save_data)
                             urls = [e.get("url", "") for e in entries if e.get("url")]
-                            result = {"status": "ok", "url": target, "apis_discovered": len(urls), "backend_urls": urls[:50]}
+                            result = {"status": "ok", "url": target, "session_id": session_id, "apis_discovered": len(urls), "backend_urls": urls[:50]}
+
                 elif tool_name == "get_backend_urls":
                     limit = tool_args.get("limit", 50)
                     requests = await db.get_recent_requests(limit * 2)
@@ -264,46 +403,64 @@ def create_app():
                             if len(backend_urls) >= limit:
                                 break
                     result = {"backend_urls": backend_urls, "count": len(backend_urls)}
-                elif tool_name == "navigate_with_selenium":
-                    from browser_selenium import navigate_and_capture_network_selenium, SELENIUM_AVAILABLE
-                    if not SELENIUM_AVAILABLE:
-                        result = {"error": "Selenium not installed. Run: pip install selenium"}
-                    else:
-                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
-                        if not target:
-                            result = {"error": "No URL. Set url= or FRONTEND_URL in .env"}
-                        else:
-                            if not target.startswith(("http://", "https://")):
-                                target = "https://" + target
-                            entries = await navigate_and_capture_network_selenium(target, headless=tool_args.get("headless", False))
-                            for e in entries:
-                                await db.save_request(e)
-                            result = {"status": "ok", "url": target, "requests_captured": len(entries)}
+
+                # Network logs tools
                 elif tool_name == "get_network_logs":
-                    requests = await db.get_recent_requests(tool_args.get("limit", 20))
+                    requests = await db.get_recent_requests(
+                        tool_args.get("limit", 20),
+                        include_bodies=tool_args.get("include_bodies", False)
+                    )
                     result = requests
+
+                elif tool_name == "get_network_logs_with_bodies":
+                    requests = await db.get_recent_requests(tool_args.get("limit", 20), include_bodies=True)
+                    result = requests
+
                 elif tool_name == "get_failed_requests":
-                    requests = await db.get_failed_requests(tool_args.get("limit", 20))
+                    requests = await db.get_failed_requests(
+                        tool_args.get("limit", 20),
+                        include_bodies=tool_args.get("include_bodies", False)
+                    )
                     result = requests
+
+                elif tool_name == "get_failed_requests_with_bodies":
+                    requests = await db.get_failed_requests(tool_args.get("limit", 20), include_bodies=True)
+                    result = requests
+
+                elif tool_name == "get_endpoint_details":
+                    details = await db.get_by_url(tool_args.get("url", ""), include_body=tool_args.get("include_body", False))
+                    result = details or {"error": "URL not found"}
+
+                elif tool_name == "get_endpoint_details_with_body":
+                    details = await db.get_by_url(tool_args.get("url", ""), include_body=True)
+                    result = details or {"error": "URL not found"}
+
                 elif tool_name == "search_requests":
                     requests = await db.search_requests(
                         method=tool_args.get("method"),
                         status_code=tool_args.get("status_code"),
                         url_contains=tool_args.get("url_contains"),
-                        limit=tool_args.get("limit", 20)
+                        limit=tool_args.get("limit", 20),
+                        include_bodies=tool_args.get("include_bodies", False)
                     )
                     result = requests
+
                 elif tool_name == "clear_logs":
                     await db.clear_all()
                     result = {"status": "cleared"}
+
                 elif tool_name == "get_slow_requests":
-                    requests = await db.get_slow_requests(tool_args.get("threshold_ms", 1000))
+                    requests = await db.get_slow_requests(
+                        tool_args.get("threshold_ms", 1000),
+                        include_bodies=tool_args.get("include_bodies", False)
+                    )
                     result = requests
-                elif tool_name == "get_endpoint_details":
-                    details = await db.get_by_url(tool_args.get("url", ""))
-                    result = details or {"error": "URL not found"}
+
                 elif tool_name == "export_network_logs_to_txt":
-                    requests = await db.get_recent_requests(tool_args.get("limit", 100))
+                    requests = await db.get_recent_requests(
+                        tool_args.get("limit", 100),
+                        include_bodies=tool_args.get("include_bodies", False)
+                    )
                     file_path = tool_args.get("file_path", "netmcp_export.txt")
                     base = os.path.dirname(os.path.abspath(__file__))
                     path = file_path if os.path.isabs(file_path) else os.path.join(base, file_path)
@@ -313,11 +470,38 @@ def create_app():
                         lines.append(f"URL: {r.get('url', '')}")
                         lines.append(f"Method: {r.get('method', '')}  Status: {r.get('status', '')}  Time: {r.get('response_time_ms', 0)}ms")
                         lines.append(f"Timestamp: {r.get('timestamp', '')}")
+                        if tool_args.get("include_bodies"):
+                            body = r.get('response_body', '')
+                            if body:
+                                lines.append(f"Response Body: {body[:2000]}{'...' if len(body) > 2000 else ''}")
                         lines.append("")
                     text = "\n".join(lines)
                     with open(path, "w", encoding="utf-8") as f:
                         f.write(text)
                     result = {"status": "exported", "path": path, "count": len(requests)}
+
+                # Console logs tools
+                elif tool_name == "get_console_logs":
+                    logs = await db.get_console_logs(
+                        session_id=tool_args.get("session_id"),
+                        limit=tool_args.get("limit", 100) * 2
+                    )
+                    log_type = tool_args.get("log_type")
+                    if log_type:
+                        logs = [l for l in logs if l.get("type") == log_type.lower()]
+                    logs = sorted(logs, key=lambda x: x.get("timestamp", 0), reverse=True)[:tool_args.get("limit", 100)]
+                    summary = {}
+                    for log in logs:
+                        t = log.get("type", "unknown")
+                        summary[t] = summary.get(t, 0) + 1
+                    result = {"logs": logs, "count": len(logs), "summary": summary}
+
+                elif tool_name == "get_console_errors":
+                    logs = await db.get_console_logs(limit=tool_args.get("limit", 50) * 2)
+                    error_logs = [l for l in logs if l.get("type") in ("error", "page_error")]
+                    error_logs = sorted(error_logs, key=lambda x: x.get("timestamp", 0), reverse=True)[:tool_args.get("limit", 50)]
+                    result = {"errors": error_logs, "count": len(error_logs)}
+
                 else:
                     result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -340,18 +524,18 @@ def create_app():
                 "error": {"code": -32603, "message": f"Internal error: {str(e)}"}
             }
 
-    # Register stateless handler for both paths so Claude Code (../Prod/mcp/) and Cursor (../Prod/mcp-http) work
+    # Register stateless handler for both paths so Claude Code and Cursor both work
     api.add_api_route("/mcp-http", _mcp_http_handler, methods=["POST"])
     api.add_api_route("/mcp", _mcp_http_handler, methods=["POST"])
     api.add_api_route("/mcp/", _mcp_http_handler, methods=["POST"])
-    # On Lambda, do not mount the SSE app at /mcp so POST /mcp and /mcp/ hit our stateless handler above
+    # On Lambda, do not mount the SSE app at /mcp so POST /mcp hits our stateless handler
     if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
         api.mount("/mcp", mcp_app)
 
     @api.get("/mcp-http")
     async def mcp_http_get():
         """Health check for HTTP endpoint."""
-        return {"status": "MCP HTTP endpoint ready", "version": "3.1.0"}
+        return {"status": "MCP HTTP endpoint ready", "version": "3.2.0"}
 
     @api.post("/ingest")
     async def ingest_request(request: Request):
@@ -396,10 +580,25 @@ def create_app():
         from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
         if not PLAYWRIGHT_AVAILABLE:
             return {"error": "Playwright not installed"}, 503
-        entries = await navigate_and_capture_network(target, headless=headless)
+
+        session_id = str(uuid.uuid4())
+        result = await navigate_and_capture_network(target, headless=headless, capture_console_logs=True)
+        entries = result.get("requests", [])
+        console_logs = result.get("console_logs", [])
+
         for e in entries:
+            e["capture_session_id"] = session_id
             await db.save_request(e)
-        return {"status": "ok", "url": target, "requests_captured": len(entries)}
+        if console_logs:
+            await db.save_console_logs(session_id, console_logs)
+
+        return {
+            "status": "ok",
+            "url": target,
+            "session_id": session_id,
+            "requests_captured": len(entries),
+            "console_logs_captured": len(console_logs),
+        }
 
     @api.get("/api/failed_requests")
     async def api_failed_requests(limit: int = 20):
@@ -415,9 +614,8 @@ app = create_app()
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
-# Lambda handler for AWS SAM (API Gateway → Lambda)
-# Create app per invocation so StreamableHTTPSessionManager.run() is only called once per instance
-# (the library forbids calling run() twice on the same instance; Mangum runs lifespan per request).
+
+# Lambda handler for AWS SAM (API Gateway -> Lambda)
 try:
     from mangum import Mangum
 

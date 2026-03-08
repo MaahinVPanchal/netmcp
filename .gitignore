@@ -2,7 +2,12 @@
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
 *.pem
+
+# API keys / analytics (never commit – e.g. PostHog phc_*, Supabase anon key, Stripe secret)
+# Keep all keys in .env and ensure .env is in .gitignore
 
 # Python
 __pycache__/
