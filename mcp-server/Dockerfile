@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Use GCR mirror to avoid Docker Hub 401 (rate limit / auth issues on some build platforms)
+FROM mirror.gcr.io/library/python:3.11-slim
 
 WORKDIR /app
 
