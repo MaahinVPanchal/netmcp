@@ -54,7 +54,7 @@ In **Build & Runtime** use:
 | Field | Value |
 |-------|--------|
 | **Build Command** | `apk add --no-cache python3 py3-pip && cd mcp-server && pip3 install -r requirements.txt` |
-| **Start Command** | `cd mcp-server && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000` |
+| **Start Command** | `python3 main.py` |
 | **Port** | `8000` |
 
 Then **Redeploy**. The build step installs Python + pip in the Alpine image; the start step runs NetMCP. Use **Start Command** `python3 main.py` so the app respects the **PORT** env var (many platforms set it).
