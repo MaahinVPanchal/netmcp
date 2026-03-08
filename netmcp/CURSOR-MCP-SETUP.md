@@ -13,11 +13,17 @@ Use this so Cursor can talk to your NetMCP server and open the frontend in Chrom
 {
   "mcpServers": {
     "netmcp": {
-      "url": "http://localhost:8000/mcp"
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+      ]
     }
   }
 }
 ```
+
+**Note:** Use `/mcp-http` (not `/mcp`) for AWS Lambda deployment. The `/mcp` endpoint uses SSE which requires persistent sessions - this doesn't work with Lambda's stateless nature. The `/mcp-http` endpoint uses stateless HTTP transport.
 
 **Option B – Use project config file**
 
@@ -77,8 +83,16 @@ To use NetMCP from another PC or without running CMD locally:
 3. In Cursor’s mcp.json, set:
 
 ```json
-"netmcp": {
-  "url": "https://your-deployed-netmcp.com/mcp"
+{
+  "mcpServers": {
+    "netmcp": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+      ]
+    }
+  }
 }
 ```
 

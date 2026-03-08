@@ -1,11 +1,16 @@
 {
   "mcpServers": {
     "netmcp": {
-      "url": "http://localhost:8000/mcp"
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+      ]
     }
   },
   "netmcp": {
     "frontend_url": "https://voicezero.ai",
-    "backend_url": "https://kitebvteletvheszekfg.supabase.co"
+    "backend_url": "https://kitebvteletvheszekfg.supabase.co",
+    "storage_backend": "dynamodb"
   }
 }
