@@ -51,7 +51,7 @@ class FileStorage:
             "request_headers": data.get("request_headers") or {},
             "request_body": data.get("request_body") or "",
             "response_headers": data.get("response_headers") or {},
-            "response_body": (str(data.get("response_body") or "")[:5000],
+            "response_body": (str(data.get("response_body") or "")[:5000]),
             "resource_type": data.get("resource_type", "unknown"),
             "console_logs": data.get("console_logs") or [],
             "capture_session_id": data.get("capture_session_id", ""),
