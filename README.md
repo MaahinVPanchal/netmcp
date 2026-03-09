@@ -27,7 +27,7 @@ Perfect for **VoiceZero.ai**, **Supabase**-backed apps, or any frontend + backen
 
 1. **Add NetMCP to Cursor**
    - Open **Cursor Settings → MCP** (or edit your MCP config file).
-   - Add the `netmcp` server. Example for the **hosted Lambda**:
+   - Add the `netmcp` server. Example for the **hosted server** (mcp-use):
 
    ```json
    {
@@ -36,7 +36,7 @@ Perfect for **VoiceZero.ai**, **Supabase**-backed apps, or any frontend + backen
          "command": "npx",
          "args": [
            "mcp-remote",
-           "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+           "https://summer-bar-rzjzu.run.mcp-use.com/mcp"
          ]
        }
      },
@@ -58,9 +58,9 @@ Perfect for **VoiceZero.ai**, **Supabase**-backed apps, or any frontend + backen
    - `fetch_and_extract_apis` – discover API URLs **without a browser** (works on Lambda).
    - `get_network_logs` / `get_failed_requests` / `get_backend_urls` / `search_requests` – query stored requests.
 
-![Cursor – Installed MCP Servers (netmcp with mcp-http and tools)](docs/cursor-mcp-servers.png)
+![Cursor – Installed MCP Servers (netmcp with mcp-use URL and tools)](docs/cursor-mcp-servers.png)
 
-*Cursor: Installed MCP Servers showing netmcp using `.../Prod/mcp-http` and the list of tools (navigate_to_app, fetch_and_extract_apis, get_backend_urls, etc.).*
+*Cursor: Installed MCP Servers showing netmcp using `https://summer-bar-rzjzu.run.mcp-use.com/mcp` and the list of tools.*
 
 ---
 
@@ -70,7 +70,7 @@ Perfect for **VoiceZero.ai**, **Supabase**-backed apps, or any frontend + backen
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`  
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
-Use this exact URL in the args: **`.../Prod/mcp-http`** (not `.../Prod/mcp` or `.../Prod/mcp/`). You can pass frontend/backend/storage via headers as below.
+Use this URL in the args: **`https://summer-bar-rzjzu.run.mcp-use.com/mcp`**. You can pass frontend/backend/storage via headers as below.
 
 ### Example `claude_desktop_config.json`
 
@@ -81,7 +81,7 @@ Use this exact URL in the args: **`.../Prod/mcp-http`** (not `.../Prod/mcp` or `
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://r06a66ywad.execute-api.us-east-1.amazonaws.com/Prod/mcp-http",
+        "https://summer-bar-rzjzu.run.mcp-use.com/mcp",
         "--header",
         "x-frontend-url:https://voicezero.ai",
         "--header",
@@ -101,11 +101,11 @@ Replace the URL and header values with your own frontend, backend, and optional 
 
 **In the UI:** Settings → Developer → Local MCP servers → Edit Config, or paste the above into your config file.
 
-![Claude Desktop – Local MCP servers (netmcp with mcp-http URL and headers)](docs/claude-desktop-mcp-config.png)
+![Claude Desktop – Local MCP servers (netmcp with mcp-use URL and headers)](docs/claude-desktop-mcp-config.png)
 
-*Claude Desktop: Settings → Developer → Local MCP servers. Use `/mcp-http` in the URL and optional `--header` args for frontend/backend/storage.*
+*Claude Desktop: Settings → Developer → Local MCP servers. Use the mcp-use URL and optional `--header` args for frontend/backend/storage.*
 
-1. **Configure MCP** in Claude Desktop / Claude Code to point at the NetMCP endpoint (Lambda `.../Prod/mcp-http` or local `http://localhost:8000/mcp`).
+1. **Configure MCP** in Claude Desktop / Claude Code to point at the NetMCP endpoint (`https://summer-bar-rzjzu.run.mcp-use.com/mcp` or local `http://localhost:8000/mcp`).
 2. Use the same structure in your config: `mcpServers.netmcp` with `args` including the full URL and optional `--header x-frontend-url:...` etc.
 3. In conversation, ask Claude to **use the netmcp tools** (e.g. *“Use NetMCP fetch_and_extract_apis for https://myapp.com and get_backend_urls”*).
 
@@ -194,8 +194,8 @@ Your NetMCP server is **already an existing MCP server** (built with FastMCP, de
 
 1. **Use the “Deploy an existing MCP server” path** (as in the MCP setup UI): your server is deployed at your API Gateway URL; you only need to share how to connect.
 2. **Share your public MCP endpoint** and a ready-to-paste config:
-   - **Endpoint:** `https://YOUR_API.execute-api.us-east-1.amazonaws.com/Prod/mcp-http`  
-     (replace with your stack’s URL, e.g. from `sam deploy` outputs or AWS Console.)
+   - **Endpoint:** `https://summer-bar-rzjzu.run.mcp-use.com/mcp`  
+     (or your own deployment URL from [mcp-use](https://mcp-use.com) or AWS Lambda.)
    - **Config for Cursor / Claude** (they paste this into MCP settings):
    ```json
    {
@@ -204,7 +204,7 @@ Your NetMCP server is **already an existing MCP server** (built with FastMCP, de
          "command": "npx",
          "args": [
            "mcp-remote",
-           "https://YOUR_API.execute-api.us-east-1.amazonaws.com/Prod/mcp-http"
+           "https://summer-bar-rzjzu.run.mcp-use.com/mcp"
          ]
        }
      }
@@ -212,7 +212,7 @@ Your NetMCP server is **already an existing MCP server** (built with FastMCP, de
    ```
 3. **Optional:** Add `--header` args if they need a specific frontend/backend:
    `"--header" "x-frontend-url:https://their-app.com"` and `"--header" "x-backend-url:https://their-supabase.supabase.co"`.
-4. **If mcp-use is a directory or marketplace:** submit your server there using the same **mcp-http** URL and, if they ask, the JSON snippet above. Your tool is “deployed” once the Lambda stack is live; “providing” it = sharing the URL + config.
+4. **If mcp-use is a directory or marketplace:** submit your server there using the same URL and, if they ask, the JSON snippet above. You can use the hosted NetMCP at the URL above or deploy your own (Lambda or mcp-use).
 
 ---
 
