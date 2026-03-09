@@ -1,5 +1,7 @@
 # NetMCP – AI Network Inspector
 
+![NetMCP Logo](../docs/netmcp-logo.png)
+
 Capture browser network traffic, console logs, and API requests. Store in **DynamoDB** or **JSONL file**, query via MCP tools from **[Cursor](https://cursor.com)** or **[Claude Code](https://claude.ai/code)**.
 
 **Stack:** FastAPI + FastMCP + (DynamoDB | file). Deploy: API Gateway → Lambda → DynamoDB.
@@ -275,3 +277,4 @@ docker run -p 8000:8000 \
   -e DYNAMO_TABLE=netmcp-requests \
   netmcp
 ```
+

@@ -1,5 +1,7 @@
 # 🎯 NetMCP – AI Network Inspector
 
+![NetMCP Logo](docs/netmcp-logo.png)
+
 > **Capture browser & API traffic, discover backend URLs, and inspect failed requests** — from **[Cursor](https://cursor.com)** and **[Claude Code](https://claude.ai/code)** via MCP.
 
 [![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20DynamoDB-orange?logo=amazon-aws)](https://aws.amazon.com/)
@@ -225,3 +227,4 @@ Your NetMCP server is **already an existing MCP server** (built with FastMCP, de
 ## 📄 License
 
 See repository license file (if present). NetMCP is provided as-is for use with Cursor, Claude Code, and other MCP-compatible clients.
+
