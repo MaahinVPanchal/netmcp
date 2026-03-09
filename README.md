@@ -1,6 +1,6 @@
-# 🎯 NetMCP – AI Network Inspector
+# <img src="docs/netmcp-logo.png" width="45" height="45"/> NetMCP – AI Network Inspector
 
-![NetMCP Logo](docs/netmcp-logo.png)
+
 
 > **Capture browser & API traffic, discover backend URLs, and inspect failed requests** — from **[Cursor](https://cursor.com)** and **[Claude Code](https://claude.ai/code)** via MCP.
 
