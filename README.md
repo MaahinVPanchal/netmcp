@@ -165,31 +165,6 @@ See **[netmcp/infra/DEPLOY.md](netmcp/infra/DEPLOY.md)** for parameter details a
 
 ---
 
-## 💵 How to get the $20 billing alert
-
-Your current deploy may have **cost protection turned off** (`EnableCostProtection=false`). To get an **email when estimated charges hit $20**:
-
-1. **Redeploy with cost protection and your email:**
-   ```powershell
-   cd netmcp\infra
-   $env:PIP_PLATFORM = "manylinux2014_x86_64"
-   sam build
-   sam deploy --no-confirm-changeset `
-     --stack-name netmcp-app `
-     --parameter-overrides `
-       "FrontendUrl=https://voicezero.ai" `
-       "BackendUrl=https://kitebvteletvheszekfg.supabase.co" `
-       "EnableCostProtection=true" `
-       "AlertEmail=your-email@example.com" `
-       "MonthlyBudget=20" `
-     --capabilities CAPABILITY_IAM
-   ```
-2. **Confirm the SNS email** – AWS sends a subscription confirmation to `AlertEmail`; click the link so the alarm can notify you.
-3. When estimated monthly charges exceed **$20**, CloudWatch triggers the alarm and you get an email.  
-   If deploy fails with a validation hook, keep `EnableCostProtection=false` and set a **manual budget alert** in **AWS Billing → Budgets** (e.g. $20/month, email notification).
-
----
-
 ## 📤 Provide your MCP tool for mcp-use (share with others)
 
 Your NetMCP server is **already an existing MCP server** (built with FastMCP, deployed on Lambda). To **provide it** so others can use it in Cursor / Claude / mcp-use:
