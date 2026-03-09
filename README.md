@@ -1,4 +1,4 @@
-# <img src="docs/netmcp-logo.png" width="45" height="45"/> NetMCP – AI Network Inspector
+# <img src="docs/netmcp.png" width="45" height="45"/> NetMCP – AI Network Inspector
 
 
 
