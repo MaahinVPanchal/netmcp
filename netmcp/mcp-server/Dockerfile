@@ -1,11 +1,66 @@
-# Use GCR mirror to avoid Docker Hub 401 on some build platforms
-FROM mirror.gcr.io/library/python:3.11-slim
+# NetMCP Docker Image with Playwright Support
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system dependencies for Chrome/Playwright
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    ca-certificates \
+    fonts-liberation \
+    libappindicator3-1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Install Playwright browsers (Chromium is sufficient for most use cases)
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Copy application code
 COPY . .
 
+# Expose the API port
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

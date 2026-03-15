@@ -1,22 +1,19 @@
 """Selenium browser automation: navigate and capture network traffic + console logs."""
 import asyncio
+import json
+import time
 from typing import List, Dict, Any
 
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
     SELENIUM_AVAILABLE = True
 except ImportError:
     webdriver = None
     Options = None
-    Service = None
-    DesiredCapabilities = None
     SELENIUM_AVAILABLE = False
 
-
-# Max size for response bodies to store (10KB)
+# Max response body size stored per request (10 KB)
 MAX_RESPONSE_BODY_SIZE = 10 * 1024
 
 
@@ -25,20 +22,16 @@ def _capture_network_sync(
     headless: bool = True,
     capture_console_logs: bool = True,
     capture_response_bodies: bool = False,
-    max_body_size: int = MAX_RESPONSE_BODY_SIZE
+    max_body_size: int = MAX_RESPONSE_BODY_SIZE,
 ) -> Dict[str, Any]:
     """
-    Capture network requests and console logs using Selenium.
+    Synchronous Selenium capture. Runs inside asyncio.to_thread.
 
-    Args:
-        url: URL to navigate to
-        headless: Run browser in headless mode
-        capture_console_logs: Capture browser console logs (errors, warnings, etc.)
-        capture_response_bodies: Capture response bodies (limited support in Selenium)
-        max_body_size: Maximum response body size in bytes (default 10KB)
+    Note: Selenium has limited network capture compared to Playwright.
+    Response bodies are not available via the performance log API.
 
     Returns:
-        Dict with 'requests' (List[dict]) and 'console_logs' (List[dict])
+        Dict with 'requests' (List[dict]) and 'console_logs' (List[dict]).
     """
     if not SELENIUM_AVAILABLE:
         return {"requests": [], "console_logs": []}
@@ -49,25 +42,21 @@ def _capture_network_sync(
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.set_capability("goog:loggingPrefs", {"performance": "ALL", "browser": "ALL"})
 
-    # Enable performance logging for network capture
-    opts.set_capability("goog:loggingPrefs", {"performance": "all", "browser": "ALL"})
-
+    driver = None
     try:
         driver = webdriver.Chrome(options=opts)
         driver.get(url)
+        time.sleep(2)  # allow network activity to settle
 
-        import time
-        time.sleep(2)
+        perf_logs = driver.get_log("performance")
 
-        # Get performance logs (network)
-        logs = driver.get_log("performance")
-
-        # Get browser logs (console)
         if capture_console_logs:
             try:
-                browser_logs = driver.get_log("browser")
-                for entry in browser_logs:
+                for entry in driver.get_log("browser"):
                     console_logs.append({
                         "type": entry.get("level", "log").lower(),
                         "text": entry.get("message", ""),
@@ -77,16 +66,25 @@ def _capture_network_sync(
             except Exception:
                 pass
 
-        driver.quit()
-    except Exception as e:
-        return {"requests": [], "console_logs": [{"type": "error", "text": str(e)}]}
+    except Exception as exc:
+        return {
+            "requests": [],
+            "console_logs": [{"type": "error", "text": str(exc), "timestamp": time.time()}],
+        }
+    finally:
+        if driver is not None:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
-    for entry in logs:
+    for entry in perf_logs:
         try:
-            import json
             msg = json.loads(entry["message"])["message"]
-            if msg.get("method") == "Network.requestWillBeSent":
-                params = msg.get("params", {})
+            method = msg.get("method", "")
+            params = msg.get("params", {})
+
+            if method == "Network.requestWillBeSent":
                 req = params.get("request", {})
                 out.append({
                     "url": req.get("url", ""),
@@ -99,24 +97,22 @@ def _capture_network_sync(
                     "response_body": "",
                     "resource_type": params.get("type", "unknown"),
                 })
-            elif msg.get("method") == "Network.responseReceived":
-                params = msg.get("params", {})
+
+            elif method == "Network.responseReceived":
                 response = params.get("response", {})
                 req_url = response.get("url", "")
-                # Update existing request with response info
                 for r in out:
                     if r.get("url") == req_url and r.get("status") == 0:
                         r["status"] = response.get("status", 0)
                         r["response_headers"] = response.get("headers", {})
-                        r["response_time_ms"] = int(response.get("timing", {}).get("receiveHeadersEnd", 0))
+                        timing = response.get("timing") or {}
+                        r["response_time_ms"] = int(timing.get("receiveHeadersEnd", 0))
                         break
+
         except Exception:
             continue
 
-    return {
-        "requests": out,
-        "console_logs": console_logs,
-    }
+    return {"requests": out, "console_logs": console_logs}
 
 
 async def navigate_and_capture_network_selenium(
@@ -124,20 +120,13 @@ async def navigate_and_capture_network_selenium(
     headless: bool = True,
     capture_console_logs: bool = True,
     capture_response_bodies: bool = False,
-    max_body_size: int = MAX_RESPONSE_BODY_SIZE
+    max_body_size: int = MAX_RESPONSE_BODY_SIZE,
 ) -> Dict[str, Any]:
     """
-    Run Selenium Chrome in a thread; return network requests and console logs.
-
-    Args:
-        url: URL to navigate to
-        headless: Run browser in headless mode
-        capture_console_logs: Capture browser console logs
-        capture_response_bodies: Capture response bodies (limited support)
-        max_body_size: Maximum response body size in bytes
+    Async wrapper: runs Selenium in a thread pool and returns captured data.
 
     Returns:
-        Dict with 'requests' (List[dict]) and 'console_logs' (List[dict])
+        Dict with 'requests' (List[dict]) and 'console_logs' (List[dict]).
     """
     return await asyncio.to_thread(
         _capture_network_sync,
@@ -145,17 +134,5 @@ async def navigate_and_capture_network_selenium(
         headless,
         capture_console_logs,
         capture_response_bodies,
-        max_body_size
+        max_body_size,
     )
-
-
-# Backward compatibility - maintain old function signature
-def _capture_network_sync_legacy(url: str, headless: bool = True) -> List[dict]:
-    """Legacy function that returns just the requests list."""
-    result = _capture_network_sync(url, headless, capture_console_logs=False, capture_response_bodies=False)
-    return result.get("requests", [])
-
-
-async def navigate_and_capture_network_selenium_legacy(url: str, headless: bool = True) -> List[dict]:
-    """Legacy async function for backward compatibility."""
-    return await asyncio.to_thread(_capture_network_sync_legacy, url, headless)

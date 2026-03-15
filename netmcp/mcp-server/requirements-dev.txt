@@ -9,3 +9,4 @@ python-dotenv
 mangum
 playwright
 selenium
+aiohttp

@@ -62,9 +62,9 @@ Resources:
     Properties:
       CodeUri: ../mcp-server/
       Handler: main.handler
-      Runtime: python3.12
-      Timeout: 30
-      MemorySize: 256
+      Runtime: python3.10
+      Timeout: 60
+      MemorySize: 512
       Environment:
         Variables:
           DYNAMO_TABLE: !Ref NetMCPTable
@@ -179,9 +179,9 @@ Resources:
     Properties:
       CodeUri: ../mcp-server/
       Handler: util.cleanup_old_records
-      Runtime: python3.12
+      Runtime: python3.10
       Timeout: 60
-      MemorySize: 128
+      MemorySize: 256
       Environment:
         Variables:
           DYNAMO_TABLE: !Ref NetMCPTable

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "netmcp": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://summer-bar-rzjzu.run.mcp-use.com/mcp"
+      ]
+    }
+  },
+  "netmcp": {
+    "frontend_url": "https://voicezero.ai",
+    "backend_url": "https://kitebvteletvheszekfg.supabase.co",
+    "storage_backend": "files"
+  }
+}

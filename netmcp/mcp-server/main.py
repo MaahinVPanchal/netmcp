@@ -41,8 +41,12 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Import availability flags
+    from browser_playwright import PLAYWRIGHT_AVAILABLE
+    from browser_selenium import SELENIUM_AVAILABLE
+
     # Stateless HTTP endpoint for Lambda compatibility (no SSE/session required).
-    # Register POST /mcp-http and POST /mcp so both work (Claude Code may use .../Prod/mcp/).
     async def _mcp_http_handler(request: Request):
         """Stateless MCP JSON-RPC handler."""
         try:
@@ -61,11 +65,84 @@ def create_app():
                             "tools": {"listChanged": True},
                             "resources": {"subscribe": False, "listChanged": True}
                         },
-                        "serverInfo": {"name": "NetMCP", "version": "3.2.0"}
+                        "serverInfo": {"name": "NetMCP", "version": "4.0.0-super-effective"}
                     }
                 }
             elif method == "tools/list":
                 tools = [
+                    # === SUPER EFFECTIVE TOOLS (New) ===
+                    {
+                        "name": "check_signup_flow",
+                        "description": "SUPER EFFECTIVE: Check signup flow automatically. Auto-detects URLs, captures network, analyzes forms, reports errors. Just say 'check my signup flow'.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to test (uses FRONTEND_URL if not provided)"},
+                                "auto_detect": {"type": "boolean", "default": True, "description": "Auto-detect frontend/backend URLs"},
+                                "headless": {"type": "boolean", "default": False},
+                                "test_email": {"type": "string", "default": "test@netmcp.local"},
+                                "test_password": {"type": "string", "default": "TestPass123!"},
+                                "enable_scrolling": {"type": "boolean", "default": True},
+                                "capture_response_bodies": {"type": "boolean", "default": True}
+                            }
+                        }
+                    },
+                    {
+                        "name": "analyze_web_app",
+                        "description": "SUPER EFFECTIVE: Comprehensive web app analysis. Auto-detects frontend/backend URLs, API endpoints, console errors, page structure. Just say 'analyze my web app'.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to analyze"},
+                                "headless": {"type": "boolean", "default": True},
+                                "scroll_full_page": {"type": "boolean", "default": True},
+                                "capture_response_bodies": {"type": "boolean", "default": False}
+                            }
+                        }
+                    },
+                    {
+                        "name": "smart_navigate",
+                        "description": "SUPER EFFECTIVE: Smart navigation with scrolling and interaction. Can scroll page, click elements, fill forms, wait for specific elements.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to navigate to"},
+                                "headless": {"type": "boolean", "default": False},
+                                "scroll_page": {"type": "boolean", "default": True},
+                                "click_selectors": {"type": "array", "items": {"type": "string"}, "description": "CSS selectors to click before capturing"},
+                                "fill_form_data": {"type": "object", "description": "Form data to fill {selector: value}"},
+                                "wait_for_selector": {"type": "string", "description": "Wait for element before capturing"},
+                                "capture_response_bodies": {"type": "boolean", "default": False}
+                            }
+                        }
+                    },
+                    {
+                        "name": "test_api_endpoint",
+                        "description": "Test an API endpoint directly (no browser needed). Useful for testing backend APIs discovered during navigation.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "API endpoint URL"},
+                                "method": {"type": "string", "default": "GET"},
+                                "headers": {"type": "object"},
+                                "body": {"type": "string"},
+                                "expected_status": {"type": "integer", "description": "Expected HTTP status code"}
+                            },
+                            "required": ["url"]
+                        }
+                    },
+                    {
+                        "name": "extract_urls_from_page",
+                        "description": "Extract all URLs from a page organized by category: scripts, styles, images, API calls, auth endpoints.",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "URL to extract from"},
+                                "include_external": {"type": "boolean", "default": False}
+                            }
+                        }
+                    },
+                    # === ORIGINAL TOOLS ===
                     {
                         "name": "navigate_to_app",
                         "description": "Open FRONTEND_URL in Chrome, capture network requests, console logs, and save to storage. Set capture_response_bodies=true to capture JSON payloads (up to 10KB).",
@@ -263,17 +340,259 @@ def create_app():
             elif method == "tools/call":
                 tool_name = params.get("name", "")
                 tool_args = params.get("arguments", {})
-
-                # Import browser modules for availability checks
-                from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
-                from browser_selenium import navigate_and_capture_network_selenium, SELENIUM_AVAILABLE
                 import uuid
 
                 # Map tool calls to actual functions
                 result = None
 
-                # Navigation tools
-                if tool_name == "navigate_to_app":
+                # === SUPER EFFECTIVE TOOLS ===
+                if tool_name == "check_signup_flow":
+                    from browser_playwright import navigate_and_capture_network, auto_detect_urls, test_signup_flow, cleanup_browser
+                    if not PLAYWRIGHT_AVAILABLE:
+                        result = {"error": "Playwright not installed"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL provided"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            session_id = str(uuid.uuid4())
+
+                            # Run detection and capture
+                            detection = await auto_detect_urls(target, headless=True) if tool_args.get("auto_detect", True) else None
+                            flow = await test_signup_flow(target, tool_args.get("test_email", "test@netmcp.local"), tool_args.get("test_password", "TestPass123!"), tool_args.get("headless", False))
+                            capture = await navigate_and_capture_network(
+                                target,
+                                headless=tool_args.get("headless", False),
+                                capture_console_logs=True,
+                                capture_response_bodies=tool_args.get("capture_response_bodies", True),
+                                enable_scrolling=tool_args.get("enable_scrolling", True),
+                                scroll_max=10,
+                            )
+
+                            entries = capture.get("requests", [])
+                            console_logs = capture.get("console_logs", [])
+
+                            for e in entries:
+                                e["capture_session_id"] = session_id
+                                await db.save_request(e)
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+
+                            errors = [log for log in console_logs if log.get("type") in ("error", "page_error")]
+                            backend_requests = [r for r in entries if any(k in r.get("url", "").lower() for k in ["/api/", "/graphql", "/auth/", "supabase"])]
+
+                            result = {
+                                "status": "ok",
+                                "session_id": session_id,
+                                "url": target,
+                                "summary": {
+                                    "total_requests": len(entries),
+                                    "backend_requests": len(backend_requests),
+                                    "console_errors": len(errors),
+                                    "forms_detected": flow.get("forms_detected", 0),
+                                },
+                                "auto_detection": detection,
+                                "flow_analysis": flow,
+                                "backend_urls": [r.get("url", "") for r in backend_requests][:20],
+                                "console_errors": errors[:20],
+                            }
+                            await cleanup_browser()
+
+                elif tool_name == "analyze_web_app":
+                    from browser_playwright import navigate_and_capture_network, auto_detect_urls, cleanup_browser
+                    if not PLAYWRIGHT_AVAILABLE:
+                        result = {"error": "Playwright not installed"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL provided"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            session_id = str(uuid.uuid4())
+
+                            detection = await auto_detect_urls(target, headless=tool_args.get("headless", True))
+                            capture = await navigate_and_capture_network(
+                                target,
+                                headless=tool_args.get("headless", True),
+                                capture_console_logs=True,
+                                capture_response_bodies=tool_args.get("capture_response_bodies", False),
+                                enable_scrolling=tool_args.get("scroll_full_page", True),
+                                scroll_max=15,
+                            )
+
+                            requests = capture.get("requests", [])
+                            console_logs = capture.get("console_logs", [])
+
+                            for e in requests:
+                                e["capture_session_id"] = session_id
+                                await db.save_request(e)
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+
+                            errors = [log for log in console_logs if log.get("type") in ("error", "page_error", "warning")]
+
+                            result = {
+                                "status": "ok",
+                                "session_id": session_id,
+                                "url": target,
+                                "page_info": capture.get("page_info", {}),
+                                "total_requests": len(requests),
+                                "errors_count": len(errors),
+                                "errors": errors[:20],
+                                "auto_detection": detection,
+                            }
+                            await cleanup_browser()
+
+                elif tool_name == "smart_navigate":
+                    from browser_playwright import (
+                        capture_network_advanced, CaptureConfig, ScrollConfig,
+                        InteractionConfig, WaitConfig, cleanup_browser
+                    )
+                    if not PLAYWRIGHT_AVAILABLE:
+                        result = {"error": "Playwright not installed"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL provided"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            session_id = str(uuid.uuid4())
+
+                            interaction = InteractionConfig()
+                            if tool_args.get("click_selectors"):
+                                interaction.click_selector = tool_args["click_selectors"][0]
+                                interaction.wait_for_navigation = True
+                            if tool_args.get("fill_form_data"):
+                                interaction.fill_form = tool_args["fill_form_data"]
+
+                            config = CaptureConfig(
+                                url=target,
+                                headless=tool_args.get("headless", False),
+                                capture_console_logs=True,
+                                capture_response_bodies=tool_args.get("capture_response_bodies", False),
+                                scroll=ScrollConfig(enabled=tool_args.get("scroll_page", True), max_scrolls=10),
+                                interaction=interaction,
+                                wait=WaitConfig(
+                                    wait_for_selector=tool_args.get("wait_for_selector"),
+                                    wait_for_selector_timeout_ms=10000,
+                                    extra_wait_ms=500,
+                                ),
+                            )
+
+                            capture = await capture_network_advanced(config)
+                            entries = capture.get("requests", [])
+                            console_logs = capture.get("console_logs", [])
+
+                            for e in entries:
+                                e["capture_session_id"] = session_id
+                                await db.save_request(e)
+                            if console_logs:
+                                await db.save_console_logs(session_id, console_logs)
+
+                            result = {
+                                "status": "ok",
+                                "session_id": session_id,
+                                "url": target,
+                                "requests_captured": len(entries),
+                                "console_logs_captured": len(console_logs),
+                                "page_info": capture.get("page_info", {}),
+                                "interactions": capture.get("interactions", []),
+                                "scrolls_performed": len(capture.get("scrolls", [])),
+                            }
+                            await cleanup_browser()
+
+                elif tool_name == "test_api_endpoint":
+                    import aiohttp
+                    import asyncio
+                    target = tool_args.get("url")
+                    if not target:
+                        result = {"error": "No URL provided"}
+                    else:
+                        start_time = asyncio.get_event_loop().time()
+                        async with aiohttp.ClientSession() as session:
+                            request_kwargs = {}
+                            if tool_args.get("headers"):
+                                request_kwargs["headers"] = tool_args["headers"]
+                            if tool_args.get("body"):
+                                request_kwargs["data"] = tool_args["body"]
+                            async with session.request(tool_args.get("method", "GET"), target, **request_kwargs) as response:
+                                response_body = await response.text()
+                                end_time = asyncio.get_event_loop().time()
+                                response_time_ms = int((end_time - start_time) * 1000)
+
+                                session_id = str(uuid.uuid4())
+                                request_data = {
+                                    "capture_session_id": session_id,
+                                    "url": target,
+                                    "method": tool_args.get("method", "GET").upper(),
+                                    "status": response.status,
+                                    "response_time_ms": response_time_ms,
+                                    "request_headers": tool_args.get("headers", {}),
+                                    "request_body": tool_args.get("body", ""),
+                                    "response_headers": dict(response.headers),
+                                    "response_body": response_body[:10000],
+                                    "resource_type": "api_test",
+                                }
+                                await db.save_request(request_data)
+
+                                expected = tool_args.get("expected_status")
+                                result = {
+                                    "status": "ok",
+                                    "session_id": session_id,
+                                    "url": target,
+                                    "response_status": response.status,
+                                    "response_time_ms": response_time_ms,
+                                    "content_type": response.headers.get("content-type", ""),
+                                    "test_passed": expected is None or response.status == expected,
+                                }
+
+                elif tool_name == "extract_urls_from_page":
+                    from browser_playwright import navigate_and_capture_network, cleanup_browser
+                    if not PLAYWRIGHT_AVAILABLE:
+                        result = {"error": "Playwright not installed"}
+                    else:
+                        target = tool_args.get("url") or os.getenv("FRONTEND_URL", "").strip()
+                        if not target:
+                            result = {"error": "No URL provided"}
+                        else:
+                            if not target.startswith(("http://", "https://")):
+                                target = "https://" + target
+                            capture = await navigate_and_capture_network(target, headless=True, capture_console_logs=False, enable_scrolling=True, scroll_max=5)
+                            requests = capture.get("requests", [])
+                            base_domain = ""  # Would extract from URL
+
+                            categories = {"api": [], "auth": [], "scripts": [], "styles": [], "images": [], "fonts": [], "other": []}
+                            seen = set()
+                            for req in requests:
+                                url = req.get("url", "")
+                                if url and url not in seen:
+                                    seen.add(url)
+                                    resource_type = req.get("resource_type", "unknown")
+                                    if resource_type == "script":
+                                        categories["scripts"].append(url)
+                                    elif resource_type == "stylesheet":
+                                        categories["styles"].append(url)
+                                    elif resource_type == "image":
+                                        categories["images"].append(url)
+                                    elif resource_type == "font":
+                                        categories["fonts"].append(url)
+                                    elif "/api/" in url.lower():
+                                        categories["api"].append(url)
+                                    elif "/auth/" in url.lower():
+                                        categories["auth"].append(url)
+                                    else:
+                                        categories["other"].append(url)
+
+                            result = {"status": "ok", "page_url": target, "total_urls": len(seen), "urls": categories}
+                            await cleanup_browser()
+
+                # === ORIGINAL NAVIGATION TOOLS ===
+                elif tool_name == "navigate_to_app":
+                    from browser_playwright import navigate_and_capture_network, cleanup_browser
                     if not PLAYWRIGHT_AVAILABLE:
                         result = {"error": "Playwright not installed"}
                     else:
@@ -304,8 +623,10 @@ def create_app():
                                 "requests_captured": len(entries),
                                 "console_logs_captured": len(console_logs),
                             }
+                            await cleanup_browser()
 
                 elif tool_name == "navigate_with_playwright":
+                    from browser_playwright import navigate_and_capture_network, cleanup_browser
                     if not PLAYWRIGHT_AVAILABLE:
                         result = {"error": "Playwright not installed"}
                     else:
@@ -336,8 +657,10 @@ def create_app():
                                 "requests_captured": len(entries),
                                 "console_logs_captured": len(console_logs),
                             }
+                            await cleanup_browser()
 
                 elif tool_name == "navigate_with_selenium":
+                    from browser_selenium import navigate_and_capture_network_selenium
                     if not SELENIUM_AVAILABLE:
                         result = {"error": "Selenium not installed"}
                     else:
@@ -535,7 +858,7 @@ def create_app():
     @api.get("/mcp-http")
     async def mcp_http_get():
         """Health check for HTTP endpoint."""
-        return {"status": "MCP HTTP endpoint ready", "version": "3.2.0"}
+        return {"status": "MCP HTTP endpoint ready", "version": "4.0.0-super-effective"}
 
     @api.post("/ingest")
     async def ingest_request(request: Request):
@@ -557,7 +880,7 @@ def create_app():
 
     @api.get("/health")
     def health():
-        return {"status": "healthy"}
+        return {"status": "healthy", "version": "4.0.0-super-effective"}
 
     @api.get("/routes")
     def list_routes():
@@ -577,7 +900,7 @@ def create_app():
             return {"error": "Set frontend_url in mcp.json or FRONTEND_URL in .env"}, 400
         if not target.startswith(("http://", "https://")):
             target = "https://" + target
-        from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE
+        from browser_playwright import navigate_and_capture_network, PLAYWRIGHT_AVAILABLE, cleanup_browser
         if not PLAYWRIGHT_AVAILABLE:
             return {"error": "Playwright not installed"}, 503
 
@@ -592,6 +915,7 @@ def create_app():
         if console_logs:
             await db.save_console_logs(session_id, console_logs)
 
+        await cleanup_browser()
         return {
             "status": "ok",
             "url": target,

@@ -1,5 +1,6 @@
-"""Selenium browser automation: navigate and capture network traffic + console logs."""
+"""Selenium browser automation: navigate and capture network traffic + console logs - OPTIMIZED for speed."""
 import asyncio
+import time
 from typing import List, Dict, Any
 
 try:
@@ -7,6 +8,8 @@ try:
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
     SELENIUM_AVAILABLE = True
 except ImportError:
     webdriver = None
@@ -19,13 +22,63 @@ except ImportError:
 # Max size for response bodies to store (10KB)
 MAX_RESPONSE_BODY_SIZE = 10 * 1024
 
+# Cached driver for reuse
+_driver_cache = None
+
+
+def _get_driver(headless: bool = True):
+    """Get or create a cached Chrome driver."""
+    global _driver_cache
+
+    if _driver_cache is not None:
+        try:
+            # Quick check if driver is still alive
+            _driver_cache.current_url
+            return _driver_cache
+        except Exception:
+            _driver_cache = None
+
+    opts = Options()
+    if headless:
+        opts.add_argument("--headless=new")
+
+    # Speed optimizations
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-gpu")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-images")  # Block images for speed
+    opts.add_argument("--disable-javascript")  # Faster if JS not needed
+    opts.add_argument("--blink-settings=imagesEnabled=false")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-setuid-sandbox")
+    opts.add_argument("--disable-logging")
+    opts.add_argument("--disable-popup-blocking")
+
+    # Enable performance logging for network capture
+    opts.set_capability("goog:loggingPrefs", {"performance": "all", "browser": "ALL"})
+
+    _driver_cache = webdriver.Chrome(options=opts)
+    return _driver_cache
+
+
+def _close_driver():
+    """Close the cached driver."""
+    global _driver_cache
+    if _driver_cache:
+        try:
+            _driver_cache.quit()
+        except Exception:
+            pass
+        _driver_cache = None
+
 
 def _capture_network_sync(
     url: str,
     headless: bool = True,
     capture_console_logs: bool = True,
     capture_response_bodies: bool = False,
-    max_body_size: int = MAX_RESPONSE_BODY_SIZE
+    max_body_size: int = MAX_RESPONSE_BODY_SIZE,
+    fast_mode: bool = True,  # NEW: Fast mode with minimal waits
 ) -> Dict[str, Any]:
     """
     Capture network requests and console logs using Selenium.
@@ -36,6 +89,7 @@ def _capture_network_sync(
         capture_console_logs: Capture browser console logs (errors, warnings, etc.)
         capture_response_bodies: Capture response bodies (limited support in Selenium)
         max_body_size: Maximum response body size in bytes (default 10KB)
+        fast_mode: Use fast capture with minimal waits (default True)
 
     Returns:
         Dict with 'requests' (List[dict]) and 'console_logs' (List[dict])
@@ -50,15 +104,34 @@ def _capture_network_sync(
     if headless:
         opts.add_argument("--headless=new")
 
+    # Speed optimizations
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-gpu")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-images")
+    opts.add_argument("--blink-settings=imagesEnabled=false")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-setuid-sandbox")
+    opts.add_argument("--disable-logging")
+    opts.add_argument("--disable-popup-blocking")
+
     # Enable performance logging for network capture
     opts.set_capability("goog:loggingPrefs", {"performance": "all", "browser": "ALL"})
 
     try:
         driver = webdriver.Chrome(options=opts)
+        driver.set_page_load_timeout(20)  # 20 second timeout
+
+        # Navigate with fast wait strategy
         driver.get(url)
 
-        import time
-        time.sleep(2)
+        # OPTIMIZED: Reduced from fixed 2 seconds to conditional wait
+        if fast_mode:
+            # Fast mode: minimal wait for initial network activity
+            time.sleep(0.3)  # Just 300ms for initial requests to start
+        else:
+            # Legacy mode: fixed 2 second wait
+            time.sleep(2)
 
         # Get performance logs (network)
         logs = driver.get_log("performance")
